@@ -36,6 +36,7 @@ const SafeVault = {
 	currentVaultId: null,
 	currentVaultItems: [],
 	currentScreen: null,
+	_boundSearchHandler: null,
 
 	// === CRYPTO STATE ===  
 	cryptoBoundary: {
@@ -2044,44 +2045,71 @@ const SafeVault = {
 	// ===========================================
 	// ITEM LIST RENDERING
 	// ===========================================
-	renderItemsList: function(items = this.currentVaultItems) {
-		const container = document.getElementById('itemsListContainer');
-		const emptyState = document.getElementById('emptyState');
-		if (!container) return;
-
-		container.innerHTML = '';
-
-		if (items.length === 0) {
-			emptyState.style.display = 'block';
-			return;
+renderItemsList: function(items = this.currentVaultItems) {
+	const container = document.getElementById('itemsListContainer');
+	const emptyState = document.getElementById('emptyState');
+	if (!container) return;
+	
+	container.innerHTML = '';
+	
+	if (items.length === 0) {
+		emptyState.style.display = 'block';
+		return;
+	}
+	
+	emptyState.style.display = 'none';
+	
+	items.forEach(item => {
+		const itemEl = document.createElement('div');
+		itemEl.className = 'list-item animate-fade-in';
+		itemEl.innerHTML = `
+            <div class="list-item-content">
+                <div class="list-item-title">${this.escapeHTML(item.label)}</div>
+                <div class="list-item-meta">
+                    <span class="tag"><i class="ph ph-tag"></i> ${this.escapeHTML(item.category)}</span>
+                </div>
+            </div>
+            <div class="flex gap-xs">
+                <button class="icon-button small" data-action="copy" data-id="${this.sanitizeForAttribute(item.id)}">
+                    <i class="ph ph-copy"></i>
+                </button>
+                <button class="icon-button small danger" data-action="delete" data-id="${this.sanitizeForAttribute(item.id)}">
+                    <i class="ph ph-trash"></i>
+                </button>
+            </div>
+        `;
+		
+		// Pasang event listener
+		const copyBtn = itemEl.querySelector('[data-action="copy"]');
+		const deleteBtn = itemEl.querySelector('[data-action="delete"]');
+		
+if (copyBtn) {
+	copyBtn.addEventListener('click', (e) => {
+		e.stopPropagation();
+		const itemId = copyBtn.dataset.id;
+		// Cari value dari memory (currentVaultItems), bukan dari DOM
+		const targetItem = this.currentVaultItems.find(i => i.id == itemId);
+		if (targetItem && targetItem.value) {
+			this.copyToClipboard(targetItem.value);
+		} else {
+			this.showToast('Gagal menyalin: Data tidak ditemukan', 'warning');
 		}
-
-		emptyState.style.display = 'none';
-
-		items.forEach(item => {
-			const itemEl = document.createElement('div');
-			itemEl.className = 'list-item animate-fade-in';
-			itemEl.innerHTML = `
-                <div class="list-item-content">
-                    <div class="list-item-title">${this.escapeHTML(item.label)}</div>
-                    <div class="list-item-meta">
-                        <span class="tag"><i class="ph ph-tag"></i> ${this.escapeHTML(item.category)}</span>
-                    </div>
-                </div>
-                <div class="flex gap-xs">
-                    <button class="icon-button small" onclick="SafeVault.copyToClipboard('${this.sanitizeForAttribute(item.value)}')">
-                        <i class="ph ph-copy"></i>
-                    </button>
-                    <button class="icon-button small danger" onclick="SafeVault.deleteItem('${item.id}')">
-                        <i class="ph ph-trash"></i>
-                    </button>
-                </div>
-            `;
-			container.appendChild(itemEl);
-		});
-
-		this.updateVaultInfo();
-	},
+	});
+}
+		
+		if (deleteBtn) {
+			deleteBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				const itemId = deleteBtn.dataset.id;
+				this.deleteItem(itemId);
+			});
+		}
+		
+		container.appendChild(itemEl);
+	});
+	
+	this.updateVaultInfo();
+},
 
 	refreshItems: async function() {
 		if (!this.currentVaultId) return;
@@ -2575,36 +2603,48 @@ const SafeVault = {
 		});
 	},
 
-	showSearch: function(e) {
-		if (e) e.stopPropagation();
+showSearch: function(e) {
+    if (e) e.stopPropagation();
+    
+    const container = document.getElementById('searchContainer');
+    const input = document.getElementById('searchInput');
+    
+    if (!container) return;
+    
+    // Lazy init bound handler
+    if (!this._boundSearchHandler) {
+        this._boundSearchHandler = this._handleSearchOutsideClick.bind(this);
+    }
 
-		const container = document.getElementById('searchContainer');
-		const input = document.getElementById('searchInput');
+    const isCurrentlyVisible = container.style.display === 'block';
+    
+    if (isCurrentlyVisible) {
+        container.style.display = 'none';
+        document.removeEventListener('click', this._boundSearchHandler);
+    } else {
+        container.style.display = 'block';
+        if (input) input.focus();
+        
+        // Pastikan bersih dulu
+        document.removeEventListener('click', this._boundSearchHandler);
+        document.addEventListener('click', this._boundSearchHandler);
+    }
+},
 
-		container.style.display = container.style.display === 'none' ? 'block' : 'none';
-		if (container.style.display === 'block') document.getElementById('searchInput').focus();
-
-		// pasang listener klik luar (sekali)
-		document.addEventListener('click', this._handleSearchOutsideClick);
-	},
-
-	_handleSearchOutsideClick: function(e) {
-		const container = document.getElementById('searchContainer');
-		const toggleBtn = document.getElementById('searchToggle');
-
-		if (!container) return;
-
-		if (
-			container.contains(e.target) ||
-			toggleBtn?.contains(e.target)
-		) {
-			return; // klik di dalam → abaikan
-		}
-
-		// klik di luar → tutup
-		container.style.display = 'none';
-		document.removeEventListener('click', SafeVault._handleSearchOutsideClick);
-	},
+_handleSearchOutsideClick: function(e) {
+    const container = document.getElementById('searchContainer');
+    const toggleBtn = document.querySelector('[onclick*="showSearch"], [data-action="search-toggle"]');
+    
+    if (!container) return;
+    
+    if (container.contains(e.target) || (toggleBtn && toggleBtn.contains(e.target))) {
+        return;
+    }
+    
+    container.style.display = 'none';
+    // Gunakan referensi yang tersimpan
+    document.removeEventListener('click', this._boundSearchHandler);
+},
 
 	// ===========================================
 	// MODAL MANAGEMENT
@@ -3030,7 +3070,7 @@ window.showCreateVaultScreen = () => SafeVault.showCreateVaultScreen();
 window.showEmergencyModal = () => SafeVault.showEmergencyModal();
 window.showModal = (id) => SafeVault.showModal(id);
 window.showRecoveryModal = () => SafeVault.showRecoveryModal();
-window.showSearch = () => SafeVault.showSearch();
+window.showSearch = (e) => SafeVault.showSearch(e);
 window.showVaultOptions = (vaultId) => SafeVault.showVaultOptions(vaultId);
 window.showVaultSwitcher = () => SafeVault.showVaultSwitcher();
 window.switchVault = (vaultId) => SafeVault.switchVault(vaultId);
