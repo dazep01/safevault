@@ -1557,3 +1557,32 @@
     visibility: visible !important;
 }
 
+/* Perbaikan posisi mainApp agar mulai dari atas */
+#mainApp.screen.active {
+    align-items: flex-start; /* Mengganti center menjadi start */
+    padding-top: calc(var(--safe-top) + var(--space-xl));
+}
+
+/* Membatasi tinggi List Container */
+#itemsListContainer {
+    max-height: 400px; /* Anda bisa menyesuaikan angka ini (misal: 50vh) */
+    overflow-y: auto;  /* Munculkan scrollbar jika konten melebihi max-height */
+    padding-right: var(--space-xs); /* Ruang kecil agar scrollbar tidak menempel ke kartu */
+    margin-bottom: var(--space-md);
+}
+
+/* Opsional: Mempercantik scrollbar khusus untuk list */
+#itemsListContainer::-webkit-scrollbar {
+    width: 4px;
+}
+
+#itemsListContainer::-webkit-scrollbar-thumb {
+    background: var(--text-tertiary);
+    border-radius: var(--radius-full);
+}
+
+/* Tambahan: Pastikan app-container mengambil lebar penuh namun tetap terpusat secara horizontal */
+#mainApp .app-container {
+    width: 100%;
+    margin-top: 0;
+}
