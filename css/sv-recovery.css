@@ -1,0 +1,108 @@
+/* ===== SAFEVAULT v2.4 RECOVERY MODULE STYLES ===== */
+/* Added at the end of style.css to avoid conflicts */
+/* Namespaced with sv- prefix */
+
+:root {
+    --sv-primary: #007AFF;
+    --sv-primary-light: rgba(0, 122, 255, 0.1);
+    --sv-success: #34C759;
+    --sv-warning: #FF9500;
+    --sv-danger: #FF3B30;
+    --sv-bg: rgba(255, 255, 255, 0.95);
+    --sv-blur: blur(20px);
+}
+
+/* Recovery modal specific */
+#svRecoveryModal .modal {
+    max-width: 400px;
+    animation: svSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes svSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Recovery key input styling */
+#svKeyInput {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+#svKeyInput:focus {
+    border-color: var(--sv-primary);
+    box-shadow: 0 0 0 3px var(--sv-primary-light);
+}
+
+/* Hint box animation */
+#svHintText {
+    transition: all 0.3s ease;
+}
+
+#svHintText:not(.hidden) {
+    animation: svFadeIn 0.3s ease;
+}
+
+@keyframes svFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Cooldown warning */
+#svCooldownNotice {
+    animation: svPulse 2s infinite;
+}
+
+@keyframes svPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* Button states */
+#svRecoveryModal .ios-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    #svRecoveryModal .modal {
+        margin: var(--space-sm);
+        max-width: calc(100% - var(--space-sm) * 2);
+    }
+    
+    #svKeyInput {
+        font-size: 16px;
+        padding: var(--space-md);
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --sv-bg: rgba(28, 28, 30, 0.95);
+    }
+    
+    #svRecoveryModal .modal {
+        background: var(--sv-bg);
+        backdrop-filter: var(--sv-blur);
+    }
+}
