@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeVault - Encrypted Local Secret Storage</title>
+    <meta name="description" content="SafeVault - Penyimpanan Rahasia Lokal Terenkripsi">
+    <!-- PWA Meta Tags -->
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
+    <meta name="theme-color" content="#007AFF">
+    <meta name="msapplication-TileColor" content="#007AFF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SafeVault">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="msapplication-navbutton-color" content="#007AFF">
+    <meta name="msapplication-starturl" content="/index.html">
+    
+    <!-- Lottie -->
+    <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.11/dist/dotlottie-wc.js" type="module"></script>
+
+    <!-- Icons & Fonts -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    
+    <!-- CRITICAL: ARGON2 KDF (SRI-ENABLED) -->
+    <script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/argon2-browser/1.18.0/argon2-bundled.min.js" 
+        integrity="sha512-Alrh8vbmKDc5xiq7I/y8LTDwy9nw1nT9S/yR73HMMoWrpX4S1kizNPdWM896c/CDIGILNwAiaih627A94kRhYQ==" 
+        crossorigin="anonymous" 
+        referrerpolicy="no-referrer">
+    </script>
+    
+    <!-- OPTIONAL: PAKO COMPRESSION (SRI-ENABLED) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    
+    <!-- OPTIONAL: ZXCVBN PASSWORD STRENGTH (SRI-ENABLED) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
+    
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/sv-recovery.css">
+
+<style>
+    /* CRITICAL: Ensure initial load screen is visible */
+    #initialLoadScreen {
+        display: flex;
+        opacity: 1;
+        visibility: visible;
+        z-index: 9999;
+    }
+    
+    /* Prevent flash of wrong screen */
+    body {
+        overflow: hidden;
+    }
+    
+/* ===== ABSOLUTE FINAL SCREEN RULE (DO NOT OVERRIDE) ===== */
+.screen {
+    display: none;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.screen.active {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+</style>
+</head>
+<body>
+    
+<div id="overlaySpinner" class="overlay-spinner hidden">
+    <div class="spinner-box">
+        <div class="spinner"></div>
+        <div class="spinner-text">Verifikasi vault identity...</div>
+    </div>
+</div>
+    
+<!-- Tambahkan SEBELUM lockScreen di HTML -->
+<div id="initialLoadScreen" class="screen active">
+    <div class="card" style="max-width: 400px; text-align: center; background: transparent; box-shadow: none; border: none;">
+        <!-- Logo Animation -->
+        <div class="fingerprint-animation-container">
+            <img style="width: 150px; height: 150px; transform: translateY(15px);" src="/img/logo.png" alt="logo">
+            <div class="fingerprint-ring ring-1"></div>
+            <div class="fingerprint-ring ring-2"></div>
+            <div class="fingerprint-ring ring-3"></div>
+            <div class="fingerprint-glow"></div>
+        </div>
+        
+        <!-- Animated Title -->
+        <div class="title-container mb-lg">
+            <h1 id="mainTitle" class="mb-xs" style="
+                font: var(--font-title);
+                color: var(--primary);
+                opacity: 0;
+                transform: translateY(20px);
+                animation: fadeInUp 1s ease-out 0.5s forwards;
+            ">SafeVault</h1>
+            <p id="subTitle" class="subtitle" style="
+                opacity: 0;
+                transform: translateY(20px);
+                animation: fadeInUp 1s ease-out 1s forwards;
+            ">Encrypted Local Secret Storage</p>
+        </div>
+        
+        <!-- Progress Container -->
+        <div class="progress-container" style="max-width: 280px; margin: 0 auto;">
+            <!-- Status Text -->
+            <p id="loadStatus" class="caption mb-sm" style="min-height: 20px;">
+                Initializing cryptographic engine...
+            </p>
+            
+            <!-- Progress Bar -->
+            <div class="progress-bar" style="height: 6px; background: var(--bg-tertiary); border-radius: var(--radius-full); overflow: hidden;">
+                <div id="loadProgress" class="progress-fill" style="
+                    height: 100%;
+                    background: linear-gradient(90deg, var(--primary), var(--secondary));
+                    width: 0%;
+                    border-radius: var(--radius-full);
+                    transition: width 0.3s ease;
+                "></div>
+            </div>
+            
+            <!-- Loading Dots -->
+            <div class="loading-dots mt-md" style="display: flex; justify-content: center; gap: 6px;">
+                <div class="dot" style="
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    opacity: 0.3;
+                    animation: pulseDot 1.5s infinite;
+                "></div>
+                <div class="dot" style="
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    opacity: 0.3;
+                    animation: pulseDot 1.5s infinite 0.2s;
+                "></div>
+                <div class="dot" style="
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    opacity: 0.3;
+                    animation: pulseDot 1.5s infinite 0.4s;
+                "></div>
+            </div>
+            
+            <!-- Security Badge -->
+            <div class="security-badge mt-xl" style="opacity: 0; animation: fadeIn 1s ease-out 2s forwards;">
+                <div class="tag" style="background: var(--primary-light); color: var(--primary);">
+                    <i class="ph ph-shield-check"></i>
+                    <span>Local • Encrypted • Offline</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Lock Screen -->
+    <div id="lockScreen" class="screen">
+        <div class="card" style="max-width: 360px;">
+            <div class="text-center mb-xl">
+                <div class="mb-lg fingerprint-animation-container">
+                    <img style="width: 150px; height: 150px; transform: translateY(15px);" src="/img/logo.png" alt="logo">
+                    <div class="fingerprint-ring ring-1"></div>
+<div class="fingerprint-ring ring-2"></div>
+<div class="fingerprint-ring ring-3"></div>
+<div class="fingerprint-glow"></div>
+                </div>
+                <h1 class="mb-sm" style="color: var(--secondary);">SafeVault</h1>
+                <p class="subtitle">Penyimpanan Rahasia Lokal Terenkripsi</p>
+            </div>
+            
+            <div class="input-group">
+                <input 
+                    type="password" 
+                    id="masterPassInput" 
+                    class="ios-input" 
+                    placeholder="Master Password" 
+                    autocomplete="current-password"
+                    autofocus
+                >
+                <div class="input-hint caption mt-sm">
+                    <i class="ph ph-info"></i>
+                    Password ini akan membuka vault yang sesuai
+                </div>
+            </div>
+            
+            <div class="mb-md" id="backoffWarning" style="display: none;">
+                <div class="tag warning">
+                    <i class="ph ph-clock"></i>
+                    <span id="backoffTimer">Tunggu 30 detik</span>
+                </div>
+            </div>
+            
+            <button id="unlockButton" class="ios-button primary full-width large" onclick="attemptUnlock()">
+                <i class="ph ph-key"></i>
+                Buka Vault
+            </button>
+            
+<div class="mt-md text-center">
+    <button class="ios-button ghost small" data-sv-hook="open-recovery" onclick="SafeVaultV2_4?.showModal()">
+        <i class="ph ph-life-buoy"></i> Lupa Password?
+    </button>
+</div>
+            
+            <div class="text-center mt-xl">
+                <p class="caption">
+                    <i class="ph ph-device-tablet"></i> Offline • 
+                    <i class="ph ph-lock"></i> AES-256 • 
+                    <i class="ph ph-shield-check"></i> Multi-Vault
+                </p>
+            </div>
+        </div>
+    </div>
+    
+<!-- SV2.4: Modal recovery baru ditambahkan setelah #lockScreen -->
+<div id="svRecoveryModal" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+            <i class="ph ph-shield-check modal-icon" style="color: var(--primary);"></i>
+            <h2 class="mb-sm">Akses Pemulihan</h2>
+            <p class="caption">Gunakan recovery key untuk membuka vault</p>
+        </div>
+        
+        <div class="card compact mb-md">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-xs">
+                    <i class="ph ph-lightbulb text-primary"></i>
+                    <span class="caption" style="font-weight: 600;">Petunjuk Password</span>
+                </div>
+                <button class="ios-button ghost small" id="svBtnShowHint" onclick="SafeVaultV2_4?.toggleHint()">
+                    Lihat
+                </button>
+            </div>
+            <p id="svHintText" class="hidden mt-sm" style="font-size: 14px; color: var(--text-primary);">
+                Hint akan muncul di sini...
+            </p>
+        </div>
+        
+        <div class="input-group mb-md">
+            <label class="input-label">Recovery Key</label>
+            <input 
+                type="text" 
+                id="svKeyInput" 
+                class="ios-input" 
+                placeholder="XXXX-XXXX-XXXX" 
+                maxlength="14"
+                style="text-align: center; letter-spacing: 2px; font-family: monospace;"
+            >
+            <div class="input-hint caption mt-sm">
+                <i class="ph ph-info"></i>
+                Masukkan recovery key yang telah Anda simpan
+            </div>
+        </div>
+        
+        <div id="svCooldownNotice" class="card compact warning mb-md" style="display: none;">
+            <div class="flex items-start gap-sm">
+                <i class="ph ph-clock"></i>
+                <div>
+                    <h4 class="mb-xs">Terlalu banyak percobaan</h4>
+                    <p class="caption" id="svCooldownText">Tunggu sebelum mencoba lagi</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-actions vertical">
+            <button class="ios-button primary full-width" onclick="SafeVaultV2_4?.tryRecovery()">
+                <i class="ph ph-key"></i> Coba Recovery
+            </button>
+            <button class="ios-button secondary full-width" onclick="SafeVaultV2_4?.downloadRecoveryKey()">
+                <i class="ph ph-download-simple"></i> Download Recovery Key
+            </button>
+            <button class="ios-button ghost full-width" onclick="SafeVaultV2_4?.hideModal()">
+                Batal
+            </button>
+        </div>
+    </div>
+</div>
+
+ <!-- Perbaikan loadingScreen di index.html -->
+<div id="loadingScreen" class="screen">
+    <div class="card" style="max-width: 280px; text-align: center;">
+        <div class="spinner mb-md"></div>
+        <h3 class="mb-sm loading-title">Memproses</h3>
+        <p class="caption loading-subtitle" id="loadingText">Membuka vault...</p>
+        <div class="progress-bar">
+            <div class="progress-fill loading-progress"></div>
+        </div>
+    </div>
+</div>
+
+    <!-- Onboarding Screens -->
+    <div id="onboardingScreen" class="screen">
+        <div class="card" style="max-width: 400px;">
+            <!-- Page 1 -->
+            <div id="onboardingPage1" class="onboarding-page active">
+                <div class="text-center mb-xl">
+                    <div class="mb-lg">
+                        <i class="ph ph-cloud-slash" style="font-size: 64px; color: var(--primary);"></i>
+                    </div>
+                    <h2 class="mb-sm">Aman, Lokal, Terenkripsi</h2>
+                    <p class="subtitle">
+                        Semua data disimpan di perangkat Anda. Tidak ada data yang dikirim ke server.
+                    </p>
+                </div>
+                
+                <div class="grid mb-xl">
+                    <div class="card compact">
+                        <div class="flex items-center gap-sm mb-sm">
+                            <i class="ph ph-device-tablet" style="color: var(--primary);"></i>
+                            <h3>100% Offline</h3>
+                        </div>
+                        <p class="caption">Berjalan sepenuhnya di browser Anda</p>
+                    </div>
+                    
+                    <div class="card compact">
+                        <div class="flex items-center gap-sm mb-sm">
+                            <i class="ph ph-lock" style="color: var(--success);"></i>
+                            <h3>Enkripsi End-to-End</h3>
+                        </div>
+                        <p class="caption">AES-256 dengan Argon2id KDF</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page 2 -->
+            <div id="onboardingPage2" class="onboarding-page" style="display: none;">
+                <div class="text-center mb-lg">
+                    <div class="mb-md">
+                        <i class="ph ph-warning-circle" style="font-size: 64px; color: var(--warning);"></i>
+                    </div>
+                    <h2 class="mb-sm">Tanggung Jawab Anda</h2>
+                </div>
+                
+                <div class="mb-xl">
+                    <div class="card compact danger mb-md">
+                        <div class="flex items-start gap-sm">
+                            <i class="ph ph-warning" style="color: var(--danger);"></i>
+                            <div>
+                                <h3 class="mb-xs">Lupa Password = Data Hilang</h3>
+                                <p class="caption">Tidak ada sistem recovery atau reset password</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card compact warning mb-md">
+                        <div class="flex items-start gap-sm">
+                            <i class="ph ph-trash" style="color: var(--warning);"></i>
+                            <div>
+                                <h3 class="mb-xs">Hapus Browser = Data Hilang</h3>
+                                <p class="caption">Data hanya tersimpan di browser ini</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card compact info">
+                        <div class="flex items-start gap-sm">
+                            <i class="ph ph-download-simple" style="color: var(--info);"></i>
+                            <div>
+                                <h3 class="mb-xs">Backup Reguler</h3>
+                                <p class="caption">File backup tetap terenkripsi dengan password Anda</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <div class="flex items-center justify-between">
+                <button id="onboardingPrev" class="ios-button secondary small" onclick="previousOnboardingPage()" style="display: none;">
+                    <i class="ph ph-caret-left"></i> Kembali
+                </button>
+                
+                <div class="flex gap-xs">
+                    <span class="onboarding-dot active" onclick="goToOnboardingPage(0)"></span>
+                    <span class="onboarding-dot" onclick="goToOnboardingPage(1)"></span>
+                </div>
+                
+                <button id="onboardingNext" class="ios-button primary small" onclick="nextOnboardingPage()">
+                    Lanjut <i class="ph ph-caret-right"></i>
+                </button>
+                <button id="onboardingFinish" class="ios-button success small" onclick="finishOnboarding()" style="display: none;">
+                    <i class="ph ph-check"></i> Saya Mengerti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Vault Screen -->
+    <div id="createVaultScreen" class="screen">
+        <div class="card" style="max-width: 400px;">
+            <div class="text-center mb-lg">
+                <h2 class="mb-sm">Buat Vault Baru</h2>
+                <p class="caption">Password ini akan menjadi kunci untuk vault baru</p>
+            </div>
+            
+            <div class="input-group">
+                <label class="input-label">Master Password</label>
+                <input 
+                    type="password" 
+                    id="newMasterPassword" 
+                    class="ios-input" 
+                    placeholder="Buat password yang kuat"
+                    autocomplete="new-password"
+                >
+                <div class="strength-meter mb-xs">
+                    <div id="strengthMeterFill" class="strength-meter-fill" style="width: 0%;"></div>
+                </div>
+                <div class="strength-label">
+                    <span id="strengthText" class="caption">Masukkan password</span>
+                    <span id="strengthScore" class="caption2"></span>
+                </div>
+                <div id="passwordHints" class="input-hint mt-sm"></div>
+            </div>
+            
+            <div class="input-group">
+                <label class="input-label">Konfirmasi Password</label>
+                <input 
+                    type="password" 
+                    id="confirmMasterPassword" 
+                    class="ios-input" 
+                    placeholder="Ketik ulang password"
+                    autocomplete="new-password"
+                >
+                <div id="confirmHint" class="input-hint mt-sm"></div>
+            </div>
+            
+            <div class="input-group">
+                <label class="input-label">Nama Vault (Opsional)</label>
+                <input 
+                    type="text" 
+                    id="vaultName" 
+                    class="ios-input" 
+                    placeholder="Misal: Vault Utama"
+                    maxlength="50"
+                >
+            </div>
+            
+<div class="input-group">
+    <label class="input-label">Password Hint (Optional but Recommended)</label>
+    <input 
+        type="text" 
+        id="passwordHint" 
+        class="ios-input" 
+        placeholder="e.g., 'My first pet's name + 123'"
+        maxlength="100"
+    >
+    <div class="input-hint caption">
+        <i class="ph ph-lightbulb"></i>
+        Akan ditampilkan jika kata sandi terlupakan (dienkripsi secara lokal)
+    </div>
+</div>
+
+            
+            <div class="modal-actions mt-xl">
+                <button class="ios-button primary full-width" onclick="createNewVault()" id="createVaultButton" disabled>
+                    <i class="ph ph-plus-circle"></i> Buat Vault
+                </button>
+                <button class="ios-button secondary full-width" onclick="cancelCreateVault()">
+                    Batalkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="mainApp" class="screen">
+        <div class="app-container">
+            <!-- Timer Display -->
+            <div id="timerDisplay" class="timer-display">
+                <div class="timer-pulse"></div>
+                <span id="timerText">Auto-lock: 5:00</span>
+                <div class="countdown-circle">
+                    <svg>
+                        <circle class="countdown-bg" r="10" cx="12" cy="12"></circle>
+                        <circle class="countdown-progress" r="10" cx="12" cy="12"></circle>
+                    </svg>
+                    <div class="countdown-text" id="countdownText">300</div>
+                </div>
+            </div>
+            
+            <!-- Header -->
+            <header class="mb-xl">
+                <div class="flex items-center justify-between mb-lg">
+                    <div>
+                        <h1>SafeVault</h1>
+                        <p class="caption" id="vaultInfo">
+                            <span id="currentVaultName">Memuat...</span> • 
+                            <span id="itemCount">0 item</span>
+                        </p>
+                    </div>
+                    <div class="flex gap-xs">
+                        <button class="icon-button" onclick="showSearch(event)" title="Cari">
+                            <i class="ph ph-magnifying-glass"></i>
+                        </button>
+                        <button class="icon-button" onclick="showVaultSwitcher()" title="Kelola Vault">
+                            <i class="ph ph-folders"></i>
+                        </button>
+                        <button class="icon-button" onclick="lockApp()" title="Kunci">
+                            <i class="ph ph-power"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Search Bar -->
+                <div id="searchContainer" class="search-container" style="display: none;">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="search-input" 
+                        placeholder="Cari item..."
+                        autocomplete="off"
+                    >
+                    <button class="search-clear" onclick="clearSearch()" id="clearSearchBtn" style="display: none;">
+                        <i class="ph ph-x"></i>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Security Note -->
+            <div class="card compact warning mb-lg">
+                <div class="flex items-start gap-md">
+                    <i class="ph ph-shield-warning" style="color: var(--warning); font-size: 20px;"></i>
+                    <div>
+                        <h3 class="mb-xs">Keamanan Clipboard</h3>
+                        <p class="caption">Data yang disalin akan dihapus otomatis dalam 30 detik</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vault Switcher -->
+            <div id="vaultSwitcher" class="card mb-lg" style="display: none;">
+                <div class="flex items-center justify-between mb-md">
+                    <h3>Kelola Vault</h3>
+                    <button class="icon-button small" onclick="hideVaultSwitcher()">
+                        <i class="ph ph-x"></i>
+                    </button>
+                </div>
+                <div id="vaultListContainer" class="mb-md"></div>
+                <button class="ios-button secondary full-width" onclick="showCreateVaultScreen()">
+                    <i class="ph ph-plus"></i> Buat Vault Baru
+                </button>
+            </div>
+            
+            <!-- Add Item Card -->
+            <div class="card mb-lg">
+                <h3 class="mb-md">Tambah Item Baru</h3>
+                <div class="input-group">
+                    <label class="input-label">Label</label>
+                    <input 
+                        type="text" 
+                        id="itemLabel" 
+                        class="ios-input" 
+                        placeholder="Misal: API Key Twitter"
+                        maxlength="100"
+                    >
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label">Kategori</label>
+                    <div class="flex flex-wrap gap-xs mb-sm" id="categoryTags"></div>
+                    <input 
+                        type="text" 
+                        id="itemCategory" 
+                        class="ios-input" 
+                        placeholder="Tekan Enter untuk tambah kategori"
+                        list="categorySuggestions"
+                    >
+                    <datalist id="categorySuggestions">
+                        <option value="Social Media">
+                        <option value="Banking">
+                        <option value="Email">
+                        <option value="API Keys">
+                        <option value="SSH Keys">
+                        <option value="Database">
+                        <option value="WiFi">
+                        <option value="Notes">
+                    </datalist>
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label">Tags (Opsional)</label>
+                    <div class="flex flex-wrap gap-xs mb-sm" id="tagContainer"></div>
+                    <input 
+                        type="text" 
+                        id="itemTags" 
+                        class="ios-input" 
+                        placeholder="Pisahkan dengan koma: work, critical, backup"
+                    >
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label">Password / Secret Value</label>
+                    <div class="relative">
+                        <input 
+                            type="password" 
+                            id="itemValue" 
+                            class="ios-input" 
+                            placeholder="Masukkan password atau secret"
+                            style="padding-right: 50px;"
+                        >
+<!-- button di form item -->
+<button 
+    class="icon-button small" 
+    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%);"
+    onclick="togglePasswordVisibility('itemValue')"
+    type="button"
+>
+    <i class="ph ph-eye"></i>
+</button>
+                    </div>
+                </div>
+                
+                <button class="ios-button primary full-width mt-md" onclick="saveItem()">
+                    <i class="ph ph-plus-circle"></i> Simpan Item
+                </button>
+            </div>
+            
+            <!-- Items List -->
+            <div id="itemsSection">
+                <div class="flex items-center justify-between mb-md">
+                    <h3>Item Tersimpan</h3>
+                    <div class="flex gap-xs">
+                        <button class="icon-button small" onclick="refreshItems()" title="Refresh">
+                            <i class="ph ph-arrows-clockwise"></i>
+                        </button>
+                        <button class="icon-button small" onclick="toggleSort()" title="Urutkan">
+                            <i class="ph ph-sort-ascending"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="itemsListContainer">
+                    <!-- Items will be dynamically inserted here -->
+                </div>
+                
+                <div id="emptyState" class="text-center mt-xl" style="display: none;">
+                    <i class="ph ph-safe" style="font-size: 64px; color: var(--text-tertiary); margin-bottom: var(--space-md);"></i>
+                    <h3 class="mb-sm">Vault Kosong</h3>
+                    <p class="caption mb-lg">Tambahkan item rahasia pertama Anda</p>
+                </div>
+            </div>
+            
+            <!-- Footer Actions -->
+            <div class="mt-xl">
+                <div class="grid grid-2 gap-md mb-md">
+                    <button class="ios-button secondary" onclick="exportVault()">
+                        <i class="ph ph-download-simple"></i> Backup
+                    </button>
+                    <button class="ios-button secondary" onclick="importVault()">
+                        <i class="ph ph-upload-simple"></i> Restore
+                    </button>
+                </div>
+                
+                <div class="text-center">
+                    <p class="caption">
+                        <i class="ph ph-lock"></i> Semua data terenkripsi lokal • 
+                        <i class="ph ph-copyright"></i> SafeVault 2024
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Tambahkan di modal section -->
+<div id="cacheModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <i class="ph ph-database modal-icon" style="color: var(--info);"></i>
+            <h2 class="mb-sm">Cache & Storage</h2>
+            <p class="caption">Manage offline storage and cache</p>
+        </div>
+        
+        <div class="card compact mb-md">
+            <div class="flex items-center justify-between mb-sm">
+                <h3>Storage Usage</h3>
+                <span id="cacheSize" class="caption">Calculating...</span>
+            </div>
+            <div class="progress-bar">
+                <div id="cacheUsageBar" class="progress-fill" style="width: 0%;"></div>
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="ios-button secondary" onclick="clearCache()">
+                <i class="ph ph-trash"></i> Clear Cache
+            </button>
+            <button class="ios-button" onclick="updateApp()">
+                <i class="ph ph-arrows-clockwise"></i> Check for Updates
+            </button>
+            <button class="ios-button ghost" onclick="hideModal('cacheModal')">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+    
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <i class="ph ph-export modal-icon" style="color: var(--primary);"></i>
+                <h2 class="mb-sm">Export Vault</h2>
+                <p class="caption">File backup akan tetap terenkripsi dengan password vault</p>
+            </div>
+            
+            <div class="input-group">
+                <label class="input-label">Password Export (Opsional)</label>
+                <input 
+                    type="password" 
+                    id="exportPassword" 
+                    class="ios-input" 
+                    placeholder="Kosongkan untuk gunakan password vault"
+                >
+                <div class="input-hint caption mt-sm">
+                    <i class="ph ph-info"></i>
+                    Password berbeda = file hanya bisa dibuka dengan password ini
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="ios-button primary full-width" onclick="performExport()">
+                    <i class="ph ph-download-simple"></i> Export Sekarang
+                </button>
+                <button class="ios-button secondary full-width" onclick="hideModal('exportModal')">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <i class="ph ph-upload-simple modal-icon" style="color: var(--info);"></i>
+                <h2 class="mb-sm">Import Vault</h2>
+                <p class="caption">Pilih file backup (.json) untuk diimpor</p>
+            </div>
+            
+            <div class="input-group">
+                <label class="input-label">Password File Backup</label>
+                <input 
+                    type="password" 
+                    id="importPassword" 
+                    class="ios-input" 
+                    placeholder="Password yang digunakan saat export"
+                >
+                <div class="input-hint caption mt-sm">
+                    <i class="ph ph-warning"></i>
+                    Password harus sama dengan saat export
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="ios-button secondary full-width" onclick="document.getElementById('importFileInput').click()">
+                    <i class="ph ph-folder-open"></i> Pilih File
+                </button>
+                <button class="ios-button ghost full-width" onclick="hideModal('importModal')">
+                    Batal
+                </button>
+            </div>
+            
+            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <i class="ph ph-trash modal-icon" style="color: var(--danger);"></i>
+                <h2 class="mb-sm">Hapus Item</h2>
+                <p class="caption" id="deleteItemLabel">Anda akan menghapus item ini secara permanen</p>
+            </div>
+            
+            <div class="modal-actions split">
+                <button class="ios-button danger" onclick="confirmDelete()">
+                    <i class="ph ph-trash"></i> Hapus
+                </button>
+                <button class="ios-button secondary" onclick="hideModal('deleteModal')">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vault Options Modal -->
+    <div id="vaultOptionsModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <i class="ph ph-gear modal-icon" style="color: var(--secondary);"></i>
+                <h2 class="mb-sm" id="vaultOptionsTitle">Vault Options</h2>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="ios-button secondary full-width" onclick="renameVault()">
+                    <i class="ph ph-pencil-simple"></i> Ubah Nama
+                </button>
+                <button class="ios-button warning full-width" onclick="exportVault()">
+                    <i class="ph ph-export"></i> Export Vault
+                </button>
+                <button class="icon-button" onclick="showEmergencyModal()" title="Emergency Access">
+                    <i class="ph ph-first-aid"></i>
+                </button>
+                <button class="ios-button danger full-width" onclick="deleteVault()">
+                    <i class="ph ph-trash"></i> Hapus Vault
+                </button>
+                <button class="ios-button ghost full-width" onclick="hideModal('vaultOptionsModal')">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cache Management Modal -->
+<div id="cacheModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <i class="ph ph-database modal-icon" style="color: var(--info);"></i>
+            <h2 class="mb-sm">Cache & Storage</h2>
+            <p class="caption">Manage offline storage and cache</p>
+        </div>
+        
+        <div class="card compact mb-md">
+            <div class="flex items-center justify-between mb-sm">
+                <h3>Storage Usage</h3>
+                <span id="cacheSize" class="caption">Calculating...</span>
+            </div>
+            <div class="progress-bar">
+                <div id="cacheUsageBar" class="progress-fill" style="width: 0%;"></div>
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="ios-button secondary" onclick="clearCache()">
+                <i class="ph ph-trash"></i> Clear Cache
+            </button>
+            <button class="ios-button" onclick="updateApp()">
+                <i class="ph ph-arrows-clockwise"></i> Check for Updates
+            </button>
+            <button class="ios-button ghost" onclick="hideModal('cacheModal')">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Hidden File Inputs -->
+    <input type="file" id="backupFileInput" accept=".json" style="display: none;">
+
+    <!-- Clipboard Safety Overlay -->
+    <div id="clipboardOverlay" class="modal-overlay" style="background: rgba(0,0,0,0.7);">
+        <div class="modal" style="max-width: 320px;">
+            <div class="modal-header">
+                <div class="countdown-circle" style="width: 80px; height: 80px; margin: 0 auto 20px;">
+                    <svg>
+                        <circle class="countdown-bg" r="35" cx="40" cy="40"></circle>
+                        <circle class="countdown-progress" id="clipboardProgressCircle" r="35" cx="40" cy="40"></circle>
+                    </svg>
+                    <div class="countdown-text" id="clipboardCountdownText" style="font-size: 20px;">30</div>
+                </div>
+                <h2 class="mb-sm">Clipboard Aman</h2>
+                <p class="caption" id="clipboardMessage">Data akan dihapus otomatis dalam <span id="clipboardSeconds">30</span> detik</p>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="ios-button success full-width" onclick="clearClipboardNow()">
+                    <i class="ph ph-check-circle"></i> Hapus Sekarang
+                </button>
+                <button class="ios-button secondary full-width" onclick="keepClipboardData()">
+                    <i class="ph ph-clock"></i> Pertahankan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-lock Warning -->
+    <div id="autoLockWarning" class="toast warning" style="max-width: 400px; left: 50%; transform: translateX(-50%) translateY(100px);">
+        <div class="toast-content">
+            <i class="ph ph-timer toast-icon"></i>
+            <div>
+                <h3 class="mb-xs">Auto-lock dalam 10 detik</h3>
+                <p class="caption">Klik untuk tetap aktif</p>
+            </div>
+        </div>
+        <button class="ios-button small" onclick="resetAutoLock()">
+            Tetap Aktif
+        </button>
+    </div>
+    
+<!-- Tambahkan sebelum penutup </body> -->
+<div id="emergencyModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <i class="ph ph-first-aid modal-icon" style="color: var(--danger);"></i>
+            <h2 class="mb-sm">Emergency Access</h2>
+            <p class="caption">Generate a recovery key for this vault</p>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="ios-button danger full-width" onclick="generateEmergencyKey()">
+                <i class="ph ph-key"></i> Generate Emergency Key
+            </button>
+            <button class="ios-button ghost full-width" onclick="hideModal('emergencyModal')">
+                Cancel
+            </button>
+        </div>
+        
+        <div id="emergencyResult" class="mt-md" style="display: none;">
+            <div class="card compact warning">
+                <pre id="emergencyKeyOutput" style="white-space: pre-wrap; font-family: monospace; font-size: 12px; background: transparent; border: none; padding: 0; margin: 0;"></pre>
+            </div>
+            <div class="input-hint caption mt-sm">
+                <i class="ph ph-warning"></i>
+                Store this key in a safe physical location!
+            </div>
+        </div>
+    </div>
+</div>
+    
+<script src="/script/script.js"></script>
+</body>
+</html>
