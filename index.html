@@ -5,22 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeVault - Encrypted Local Secret Storage</title>
     <meta name="description" content="SafeVault - Penyimpanan Rahasia Lokal Terenkripsi">
-    <!-- PWA Meta Tags -->
-    <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png">
-    <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/android-icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
+
+    <!-- PWA Meta Tags (RELATIVE PATH) -->
+    <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="./img/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="./img/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="./img/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="./img/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
+
+    <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
+    <link rel="manifest" href="./doc/manifest.json">
+
+    <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
     <meta name="theme-color" content="#007AFF">
     <meta name="msapplication-TileColor" content="#007AFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,16 +31,16 @@
     <meta name="apple-mobile-web-app-title" content="SafeVault">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="msapplication-navbutton-color" content="#007AFF">
-    <meta name="msapplication-starturl" content="/index.html">
-    
+    <meta name="msapplication-starturl" content="./">
+
     <!-- Lottie -->
     <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.11/dist/dotlottie-wc.js" type="module"></script>
 
     <!-- Icons & Fonts -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
-    
+
     <!-- CRITICAL: ARGON2 KDF (SRI-ENABLED) -->
     <script 
         src="https://cdnjs.cloudflare.com/ajax/libs/argon2-browser/1.18.0/argon2-bundled.min.js" 
@@ -45,43 +48,41 @@
         crossorigin="anonymous" 
         referrerpolicy="no-referrer">
     </script>
-    
-    <!-- OPTIONAL: PAKO COMPRESSION (SRI-ENABLED) -->
+
+    <!-- OPTIONAL: PAKO COMPRESSION -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-    
-    <!-- OPTIONAL: ZXCVBN PASSWORD STRENGTH (SRI-ENABLED) -->
+
+    <!-- OPTIONAL: ZXCVBN PASSWORD STRENGTH -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
-    
-    <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="/css/sv-recovery.css">
 
-<style>
-    /* CRITICAL: Ensure initial load screen is visible */
-    #initialLoadScreen {
-        display: flex;
-        opacity: 1;
-        visibility: visible;
-        z-index: 9999;
-    }
-    
-    /* Prevent flash of wrong screen */
-    body {
-        overflow: hidden;
-    }
-    
-/* ===== ABSOLUTE FINAL SCREEN RULE (DO NOT OVERRIDE) ===== */
-.screen {
-    display: none;
-    opacity: 0;
-    visibility: hidden;
-}
+    <!-- Local CSS -->
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/sv-recovery.css">
 
-.screen.active {
-    display: flex !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-</style>
+    <style>
+        #initialLoadScreen {
+            display: flex;
+            opacity: 1;
+            visibility: visible;
+            z-index: 9999;
+        }
+
+        body {
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .screen.active {
+            display: flex !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+    </style>
 </head>
 <body>
     
@@ -947,6 +948,6 @@
     </div>
 </div>
     
-<script src="/script/script.js"></script>
+<script src="./script/script.js"></script>
 </body>
 </html>
